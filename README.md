@@ -46,5 +46,5 @@ This repository is under development and currently **private** for research purp
 
 ---
 
-🧑‍💻 Author: [Your Name]  
-📧 Contact: [your.email@example.com]
+🧑‍💻 Author: Trong Dai Do
+📧 Contact: daihung279@gmail.com
