@@ -1,50 +1,43 @@
-# Pareto Optimization of Hydroforming Parameters
+# ParetoOptimization
 
-This repository contains scripts and data related to the multi-objective optimization of T-tube hydroforming process using Latin Hypercube Sampling (LHS), finite element simulations, and Pareto Front analysis.
+This repository contains Python scripts for generating Latin Hypercube Sampling (LHS), building surrogate models using SMT (Surrogate Modeling Toolbox), and performing multi-objective optimization using Pareto front analysis.
 
-## 📁 Project Structure
+## Features
 
-- `lhs_generator.py` – Script for generating LHS samples for 3 input variables (X1, X2, X3)
-- `test_pareto.py` – Pareto front analysis using `oapackage`
-- `lhs_samples.csv` / `lhs_samples_saved.xlsx` – LHS input data
-- `pareto_optimal_results.csv` – Output results that are Pareto-optimal
-- `Figure_*.png` – Visualization outputs (3D scatter, Pareto front, etc.)
+- 🔁 **Latin Hypercube Sampling**: Generates 50 LHS samples for 3 variables `X1`, `X2`, `X3` with specified bounds.
+- 🧠 **Surrogate Modeling (SMT)**: RBF models for predicting STH and Height based on simulation data.
+- 🔍 **Pareto Front Optimization**: Visualizes and exports non-dominated solutions (STH & Height) using `oapackage`.
+- 📈 **Visualization**: Includes 2D plots for each objective, 3D scatter of input space, and Pareto front.
 
-## 🔧 Tools & Libraries
+## Dependencies
 
-- Python 3.13+
-- `numpy`, `matplotlib`, `pandas`
-- `scipy.stats.qmc` for LHS
-- `oapackage` for Pareto front filtering
+Install all required packages using:
 
-## 🎯 Objectives
+```bash
+pip install -r requirements.txt
+```
 
-The goal is to maximize two key performance outputs:
-- **STH**: Minimum wall thickness
-- **Height**: Branch height in hydroformed T-tube
+Ensure [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) is installed to build SMT models.
 
-Given three process variables:
-- X1: Axial Displacement
-- X2: Pressure Amplification Factor
-- X3: Internal Pressure
+## Files
 
-## 📊 Methodology
+- `lhs_generator.py`: Generate and export LHS samples.
+- `test_pareto.py`: Load results from simulation, perform Pareto front analysis.
+- `surrogate_pareto.py`: Build RBF surrogate models from data and perform Pareto optimization on predicted outcomes.
+- `lhs_samples_saved.xlsx`: 50 simulation samples.
+- `pareto_optimal_results.xlsx`: Optimized Pareto front results.
+- `requirements.txt`: List of Python packages.
 
-1. Generate 50 LHS samples over given bounds.
-2. Run FEM simulations (external) to obtain STH and Height.
-3. Apply Pareto optimization to identify non-dominated solutions.
-4. Visualize results and extract optimal designs.
+## Example Output
 
-## 📚 References
+- 📊 Pareto Front with simulation data  
+- 🤖 Surrogate model-based Pareto Front with 5000 points  
+- 📁 Exported CSV/Excel of optimal input variables
 
-- [1] OAPackage Pareto Front Example: https://oapackage.readthedocs.io/en/latest/examples/example_pareto.html  
-- [2] Scipy Latin Hypercube Sampling: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.qmc.LatinHypercube.html  
+## Citations
 
-## 🛡 License
+Some techniques or code snippets were referenced from:
 
-This repository is under development and currently **private** for research purposes. Please contact the author before redistribution.
-
----
-
-🧑‍💻 Author: Trong Dai Do
-📧 Contact: daihung279@gmail.com
+- SMT Library: https://smt.readthedocs.io/en/latest/
+- OAPackage Pareto Example: https://oapackage.readthedocs.io/en/latest/examples/example_pareto.html
+- LHS Sampling (Scipy): https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.qmc.LatinHypercube.html
