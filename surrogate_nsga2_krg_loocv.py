@@ -31,7 +31,7 @@ scaler_height = MinMaxScaler()
 Y_sth_scaled = scaler_sth.fit_transform(Y[:, 0].reshape(-1, 1)).flatten()
 Y_height_scaled = scaler_height.fit_transform(Y[:, 1].reshape(-1, 1)).flatten()
 
-# Hàm tính LOOCV error
+# Hàm tính LOOCV error with theta0
 def compute_loocv_errors(X, Y_scaled, scaler, model_type=KRG):
     n_samples = len(X)
     errors = np.zeros(n_samples)
@@ -40,15 +40,16 @@ def compute_loocv_errors(X, Y_scaled, scaler, model_type=KRG):
         # Tạo tập train và test
         train_indices = np.arange(n_samples) != i
         X_train, Y_train = X[train_indices], Y_scaled[train_indices]
-        X_test, Y_test = X[i].reshape(1, -1), Y_scaled[i]
+        X_test, Y_test = X[i].reshape(1, -1), Y_scaled[i].reshape(1, -1)
 
-        model = model_type(print_global=False)
+        # Khởi tạo model với theta0
+        model = model_type(print_global=False, theta0=[1e-2]*X.shape[1])
         model.set_training_values(X_train, Y_train)
         model.train()
 
         Y_pred_scaled = model.predict_values(X_test).flatten()
         Y_pred_actual = scaler.inverse_transform(Y_pred_scaled.reshape(-1, 1)).flatten()
-        Y_test_actual = scaler.inverse_transform([[Y_test]]).flatten()
+        Y_test_actual = scaler.inverse_transform(Y_test).flatten()
 
         errors[i] = np.sqrt(mean_squared_error(Y_test_actual, Y_pred_actual))
     return errors
@@ -70,12 +71,12 @@ plt.tight_layout()
 plt.savefig('Figure/krg_loocv_errors.png')
 plt.close()
 
-# Huấn luyện mô hình trên toàn bộ tập dữ liệu
-model_sth = KRG(print_global=False)
+# Huấn luyện mô hình trên toàn bộ tập dữ liệu với theta0
+model_sth = KRG(print_global=False, theta0=[1e-2]*X.shape[1])
 model_sth.set_training_values(X, Y_sth_scaled)
 model_sth.train()
 
-model_height = KRG(print_global=False)
+model_height = KRG(print_global=False, theta0=[1e-2]*X.shape[1])
 model_height.set_training_values(X, Y_height_scaled)
 model_height.train()
 
