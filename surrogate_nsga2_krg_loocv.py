@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import numpy as np
 from smt.surrogate_models import KRG
-from smt.sampling_methods import LHS
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
@@ -15,173 +14,154 @@ from pymoo.termination import get_termination
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 
-# Ensure output directory exists
+# --- 1. Thiết lập thư mục đầu ra
 os.makedirs("Figure", exist_ok=True)
 
-# Đọc dữ liệu
-file_path = "lhs_samples_saved.xlsx"
-df = pd.read_excel(file_path)
-X = df[['X1', 'X2', 'X3']].values
-Y = df[['STH', 'Height']].values
+# --- 2. Đọc dữ liệu gốc
+df = pd.read_excel("lhs_samples_saved.xlsx")
+X_raw = df[['X1','X2','X3']].values   # mm, –, MPa
+Y       = df[['STH','Height']].values # mm, mm
 
-# Chuẩn hóa output
-scaler_sth = MinMaxScaler()
-scaler_height = MinMaxScaler()
+# --- 3. Chuẩn hóa X về [0,1] và Y về [0,1]
+x_scaler = MinMaxScaler()
+X_scaled = x_scaler.fit_transform(X_raw)
 
-Y_sth_scaled = scaler_sth.fit_transform(Y[:, 0].reshape(-1, 1)).flatten()
-Y_height_scaled = scaler_height.fit_transform(Y[:, 1].reshape(-1, 1)).flatten()
+y1_scaler = MinMaxScaler()
+y2_scaler = MinMaxScaler()
+Y1_scaled = y1_scaler.fit_transform(Y[:,0].reshape(-1,1)).flatten()
+Y2_scaled = y2_scaler.fit_transform(Y[:,1].reshape(-1,1)).flatten()
 
-# Hàm tính LOOCV error with theta0
-def compute_loocv_errors(X, Y_scaled, scaler, model_type=KRG):
-    n_samples = len(X)
-    errors = np.zeros(n_samples)
-    
-    for i in range(n_samples):
-        # Tạo tập train và test
-        train_indices = np.arange(n_samples) != i
-        X_train, Y_train = X[train_indices], Y_scaled[train_indices]
-        X_test, Y_test = X[i].reshape(1, -1), Y_scaled[i].reshape(1, -1)
+# --- 4. Hàm tính LOOCV error trên X_scaled
+def compute_loocv_errors(X, Y_scaled, y_scaler):
+    n = len(X)
+    errs = np.zeros(n)
+    for i in range(n):
+        # chia train/test
+        mask = np.arange(n) != i
+        X_tr, X_te = X[mask], X[i].reshape(1, -1)
+        Y_tr, Y_te = Y_scaled[mask], Y_scaled[i].reshape(1, -1)
 
-        # Khởi tạo model với theta0
-        model = model_type(print_global=False, theta0=[1e-2]*X.shape[1])
-        model.set_training_values(X_train, Y_train)
+        # huấn luyện model với theta0
+        model = KRG(print_global=False, theta0=[1e-2]*X.shape[1])
+        model.set_training_values(X_tr, Y_tr)
         model.train()
 
-        Y_pred_scaled = model.predict_values(X_test).flatten()
-        Y_pred_actual = scaler.inverse_transform(Y_pred_scaled.reshape(-1, 1)).flatten()
-        Y_test_actual = scaler.inverse_transform(Y_test).flatten()
+        # dự đoán và tính RMSE trên giá trị gốc
+        y_pred_s = model.predict_values(X_te).flatten()
+        y_pred   = y_scaler.inverse_transform(y_pred_s.reshape(-1,1)).flatten()
+        y_true   = y_scaler.inverse_transform(Y_te).flatten()
+        errs[i]  = np.sqrt(mean_squared_error(y_true, y_pred))
+    return errs
 
-        errors[i] = np.sqrt(mean_squared_error(Y_test_actual, Y_pred_actual))
-    return errors
+# Tính và vẽ LOOCV
+err_loocv_1 = compute_loocv_errors(X_scaled, Y1_scaled, y1_scaler)
+err_loocv_2 = compute_loocv_errors(X_scaled, Y2_scaled, y2_scaler)
 
-# Tính lỗi LOOCV
-sth_loocv_errors = compute_loocv_errors(X, Y_sth_scaled, scaler_sth)
-height_loocv_errors = compute_loocv_errors(X, Y_height_scaled, scaler_height)
-
-# Vẽ đồ thị lỗi LOOCV
-plt.figure(figsize=(8, 6))
-plt.plot(range(1, len(sth_loocv_errors) + 1), sth_loocv_errors, label='STH LOOCV RMSE', color='blue')
-plt.plot(range(1, len(height_loocv_errors) + 1), height_loocv_errors, label='Height LOOCV RMSE', color='red')
+plt.figure(figsize=(8,6))
+plt.plot(err_loocv_1, label='STH LOOCV RMSE', color='blue')
+plt.plot(err_loocv_2, label='Height LOOCV RMSE', color='red')
 plt.xlabel('Sample Index', fontsize=18)
-plt.ylabel('LOOCV RMSE', fontsize=18)
-plt.title('LOOCV Training Errors for KRG Surrogate Models', fontsize=18)
-plt.tick_params(axis='both', labelsize=18)
-plt.grid(True)
+plt.ylabel('LOOCV RMSE (mm)', fontsize=18)
+plt.title('LOOCV Training Errors for KRG Surrogates', fontsize=16)
+plt.xticks(fontsize=18)
+plt.yticks(fontsize=18)
 plt.legend(fontsize=18)
+plt.grid(True)
 plt.tight_layout()
 plt.savefig('Figure/krg_loocv_errors.png')
 plt.close()
 
-# Huấn luyện mô hình trên toàn bộ tập dữ liệu với theta0
-model_sth = KRG(print_global=False, theta0=[1e-2]*X.shape[1])
-model_sth.set_training_values(X, Y_sth_scaled)
-model_sth.train()
+# --- 5. Huấn luyện KRG trên toàn bộ dữ liệu
+model1 = KRG(print_global=False, theta0=[1e-2]*3)
+model2 = KRG(print_global=False, theta0=[1e-2]*3)
+model1.set_training_values(X_scaled, Y1_scaled); model1.train()
+model2.set_training_values(X_scaled, Y2_scaled); model2.train()
 
-model_height = KRG(print_global=False, theta0=[1e-2]*X.shape[1])
-model_height.set_training_values(X, Y_height_scaled)
-model_height.train()
-
-# Định nghĩa bài toán tối ưu
+# --- 6. Định nghĩa bài toán NSGA-II trên [0,1]^3
 class SurrogateProblem(Problem):
     def __init__(self):
-        super().__init__(n_var=3, n_obj=2, n_constr=0, xl=np.array([10, 0.3, 40]), xu=np.array([15, 0.9, 60]))
-
+        super().__init__(n_var=3, n_obj=2, n_constr=0, xl=np.zeros(3), xu=np.ones(3))
     def _evaluate(self, X, out, *args, **kwargs):
-        sth_pred_scaled = model_sth.predict_values(X).flatten()
-        height_pred_scaled = model_height.predict_values(X).flatten()
+        y1_s = model1.predict_values(X).flatten()
+        y2_s = model2.predict_values(X).flatten()
+        y1   = y1_scaler.inverse_transform(y1_s.reshape(-1,1)).flatten()
+        y2   = y2_scaler.inverse_transform(y2_s.reshape(-1,1)).flatten()
+        out["F"] = -np.column_stack([y1, y2])
 
-        sth_pred = scaler_sth.inverse_transform(sth_pred_scaled.reshape(-1, 1)).flatten()
-        height_pred = scaler_height.inverse_transform(height_pred_scaled.reshape(-1, 1)).flatten()
-
-        out["F"] = -np.column_stack([sth_pred, height_pred])
-
-# Cấu hình thuật toán NSGA-II
-algorithm = NSGA2(
+algo = NSGA2(
     pop_size=200,
     sampling=FloatRandomSampling(),
     crossover=SBX(prob=0.9, eta=15),
     mutation=PM(eta=20),
-    eliminate_duplicates=True,
+    eliminate_duplicates=True
 )
+term = get_termination("n_gen", 200)
 
-termination = get_termination("n_gen", 200)
-
-# Thực hiện tối ưu hóa
 res = minimize(
-    SurrogateProblem(),
-    algorithm,
-    termination,
-    seed=42,
-    save_history=True,
-    verbose=True,
+    SurrogateProblem(), algo, term,
+    seed=42, save_history=True, verbose=False
 )
 
-# Phục hồi giá trị thực từ kết quả tối ưu
-F_actual = -res.F
-plt.figure(figsize=(8, 6))
-plt.scatter(F_actual[:, 0], F_actual[:, 1], c='red', label='Pareto Optimal')
-plt.xlabel("STH (mm)", fontsize=18)
-plt.ylabel("Height (mm)", fontsize=18)
-plt.title("Pareto Front from NSGA-II with Kriging Surrogate Model", fontsize=16)
-plt.tick_params(axis='both', labelsize=18)
+# --- 7. Vẽ Pareto front
+Pareto = -res.F  # [STH, Height]
+plt.figure(figsize=(8,6))
+plt.scatter(Pareto[:,0], Pareto[:,1], c='red', label='Pareto Optimal')
+plt.xlabel('STH (mm)', fontsize=18)
+plt.ylabel('Height (mm)', fontsize=18)
+plt.title('Pareto Front from NSGA-II with KRG', fontsize=16)
+plt.xticks(fontsize=18)
+plt.yticks(fontsize=18)
 plt.legend(fontsize=18)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("Figure/pareto_front.png")
+plt.savefig('Figure/pareto_front.png')
 plt.close()
 
-# Xuất dữ liệu đầu ra tối ưu
-X_optimal = res.X
-STH_scaled = model_sth.predict_values(X_optimal).flatten()
-Height_scaled = model_height.predict_values(X_optimal).flatten()
-STH_optimal = scaler_sth.inverse_transform(STH_scaled.reshape(-1, 1)).flatten()
-Height_optimal = scaler_height.inverse_transform(Height_scaled.reshape(-1, 1)).flatten()
+# --- 8. Xuất bảng Pareto với X1–X3 về giá trị gốc
+Xp_scaled = res.X
+Xp_orig   = x_scaler.inverse_transform(Xp_scaled)
+df_pareto = pd.DataFrame(Xp_orig, columns=['X1','X2','X3'])
+df_pareto['STH (mm)']    = Pareto[:,0]
+df_pareto['Height (mm)'] = Pareto[:,1]
+df_pareto.to_excel("pareto_optimal_nsga2_krg.xlsx", index=False)
 
-df_optimal = pd.DataFrame(X_optimal, columns=["X1", "X2", "X3"])
-df_optimal["STH (mm)"] = STH_optimal
-df_optimal["Height (mm)"] = Height_optimal
-df_optimal.to_excel("pareto_optimal_nsga2_krg.xlsx", index=False)
-print("Pareto optimal results have been saved to 'pareto_optimal_nsga2_krg.xlsx'")
+# --- 9. Tính sensitivity trên thang normalize [0,1] và vẽ
+def compute_sensitivity_norm(model, X, y_scaler):
+    N, d = X.shape
+    S = np.zeros((N,d))
+    delta = 0.01  # 1% step
+    for i in range(N):
+        x0 = X[i].reshape(1,-1)
+        for j in range(d):
+            xp = x0.copy(); xp[0,j] += delta
+            y0_s = model.predict_values(x0).flatten()
+            yp_s = model.predict_values(xp).flatten()
+            # trích scalar
+            y0 = y_scaler.inverse_transform(y0_s.reshape(-1,1)).flatten()[0]
+            yp = y_scaler.inverse_transform(yp_s.reshape(-1,1)).flatten()[0]
+            S[i,j] = abs((yp - y0)/delta)
+    return S.mean(axis=0)
 
-# Thêm phân tích độ nhạy (Sensitivity Analysis)
-def compute_sensitivity(model, X, scaler, output_name):
-    n_samples = X.shape[0]
-    sensitivities = np.zeros((n_samples, X.shape[1]))
-    
-    for i in range(n_samples):
-        X_perturb = X[i].reshape(1, -1)
-        for j in range(X.shape[1]):
-            X_perturb_delta = X_perturb.copy()
-            delta = 0.01 * (X[:, j].max() - X[:, j].min())  # Nhỏ perturbation
-            X_perturb_delta[0, j] += delta
-            Y_base = model.predict_values(X_perturb).flatten()
-            Y_perturb = model.predict_values(X_perturb_delta).flatten()
-            Y_base_actual = scaler.inverse_transform(Y_base.reshape(-1, 1)).flatten()
-            Y_perturb_actual = scaler.inverse_transform(Y_perturb.reshape(-1, 1)).flatten()
-            sensitivities[i, j] = np.abs((Y_perturb_actual - Y_base_actual) / delta)
-    
-    return np.mean(sensitivities, axis=0)
+sens1 = compute_sensitivity_norm(model1, X_scaled, y1_scaler)
+sens2 = compute_sensitivity_norm(model2, X_scaled, y2_scaler)
 
-# Tính độ nhạy cho STH và Height
-sensitivity_sth = compute_sensitivity(model_sth, X, scaler_sth, "STH")
-sensitivity_height = compute_sensitivity(model_height, X, scaler_height, "Height")
-
-# Vẽ đồ thị độ nhạy
-params = ['X1', 'X2', 'X3']
-plt.figure(figsize=(10, 6))
-plt.bar(np.arange(len(params)) - 0.2, sensitivity_sth, 0.4, label='STH Sensitivity', color='blue')
-plt.bar(np.arange(len(params)) + 0.2, sensitivity_height, 0.4, label='Height Sensitivity', color='red')
+# Vẽ biểu đồ độ nhạy
+params = ['X1','X2','X3']
+x = np.arange(len(params))
+plt.figure(figsize=(8,6))
+plt.bar(x-0.2, sens1, 0.4, label='STH Sensitivity')
+plt.bar(x+0.2, sens2, 0.4, label='Height Sensitivity')
 plt.xlabel('Parameters', fontsize=18)
-plt.ylabel('Average Sensitivity (mm/unit)', fontsize=18)
-plt.title('Sensitivity Analysis of Parameters on STH and Height', fontsize=18)
-plt.xticks(np.arange(len(params)), params, fontsize=18)
-plt.tick_params(axis='both', labelsize=18)
+plt.ylabel('ΔY per 1% ΔX_scaled', fontsize=18)
+plt.title('Normalized Sensitivity Analysis', fontsize=16)
+plt.xticks(x, params, fontsize=18)
+plt.yticks(fontsize=18)
 plt.legend(fontsize=18)
 plt.grid(True)
 plt.tight_layout()
 plt.savefig('Figure/sensitivity_analysis.png')
 plt.close()
 
-print(f"Sensitivity Analysis Results:")
-print(f"STH Sensitivity: X1={sensitivity_sth[0]:.4f}, X2={sensitivity_sth[1]:.4f}, X3={sensitivity_sth[2]:.4f}")
-print(f"Height Sensitivity: X1={sensitivity_height[0]:.4f}, X2={sensitivity_height[1]:.4f}, X3={sensitivity_height[2]:.4f}")
+print("Normalized sensitivity (per 1% change in X_scaled):")
+print(f"STH:   X1={sens1[0]:.4f}, X2={sens1[1]:.4f}, X3={sens1[2]:.4f}")
+print(f"Height:X1={sens2[0]:.4f}, X2={sens2[1]:.4f}, X3={sens2[2]:.4f}")
