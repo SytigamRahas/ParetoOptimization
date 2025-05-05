@@ -102,10 +102,21 @@ res = minimize(
     seed=42, save_history=True, verbose=False
 )
 
-# --- 7. Vẽ Pareto front
+# --- 7. Vẽ Pareto front + điểm validation
 Pareto = -res.F  # [STH, Height]
+
+# Validation point theo kết quả KRG
+sth_val    = 0.6777
+height_val = 13.03
+
 plt.figure(figsize=(8,6))
-plt.scatter(Pareto[:,0], Pareto[:,1], c='red', label='Pareto Optimal')
+plt.scatter(Pareto[:,0], Pareto[:,1],
+            c='red', label='Pareto Optimal', s=20)
+# Chèn điểm validation
+plt.scatter(sth_val, height_val,
+            c='black', marker='X', s=100,
+            label='Validation Point')
+
 plt.xlabel('STH (mm)', fontsize=18)
 plt.ylabel('Height (mm)', fontsize=18)
 plt.title('Pareto Front from NSGA-II with KRG', fontsize=16)
@@ -116,6 +127,7 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig('Figure/pareto_front.png')
 plt.close()
+
 
 # --- 8. Xuất bảng Pareto với X1–X3 về giá trị gốc
 Xp_scaled = res.X
