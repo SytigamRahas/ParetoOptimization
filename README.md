@@ -8,7 +8,7 @@ This repository contains Python scripts for generating Latin Hypercube Sampling 
 - 🧠 **Surrogate Modeling (SMT)**: Use Kriging (KRG) models for predicting `STH` and `Height`.
 - 🔁 **Leave-One-Out Cross-Validation (LOOCV)**: Assess training accuracy of surrogate models and plot the historical error trend.
 - 🧬 **NSGA-II Optimization**: Perform multi-objective optimization to maximize both STH and Height.
-- 📊 **Visualization**: Save plots for LOOCV error trend and the resulting Pareto front.
+- 📊 **Visualization**: Save plots for LOOCV error trend, Sensitivity analysis and the resulting Pareto front.
 
 ## Structure
 
@@ -19,7 +19,8 @@ ParetoOptimization/
 ├── Figure/
 │   ├── krg_loocv_errors.png            # Plot of LOOCV RMSE over training samples
 │   └── pareto_front.png                # Plot of Pareto front for the surrogate-based optimization
-├── surrogate_nsga2_krg_loocv.py        # Main script: KRG model + LOOCV + NSGA-II optimization
+│   └── sensitivity_analysis.png        # Plot of Sensitivity analysis
+├── surrogate_nsga2_krg_loocv.py        # Main script: KRG model + LOOCV + NSGA-II optimization + Sensitivity Analysis
 ├── requirements.txt                    # Python dependencies
 ```
 
@@ -38,7 +39,7 @@ python surrogate_nsga2_krg_loocv.py
 - **Input**: `lhs_samples_saved.xlsx` with columns `X1`, `X2`, `X3`, `STH`, `Height`
 - **Output**:
   - `pareto_optimal_nsga2_krg.xlsx`: Contains the Pareto-optimal solutions
-  - `Figure/*.png`: Visual representations of surrogate model training and optimization front
+  - `Figure/*.png`: Visual representations of surrogate model training, sensitivity analysis and optimization front
 
 ## References
 - NSGA-II in Pymoo: https://medium.com/analytics-vidhya/optimization-modelling-in-python-multiple-objectives-760b9f1f26ee

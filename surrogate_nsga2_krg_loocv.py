@@ -141,4 +141,47 @@ df_optimal = pd.DataFrame(X_optimal, columns=["X1", "X2", "X3"])
 df_optimal["STH (mm)"] = STH_optimal
 df_optimal["Height (mm)"] = Height_optimal
 df_optimal.to_excel("pareto_optimal_nsga2_krg.xlsx", index=False)
-print("✅ Pareto optimal results have been saved to 'pareto_optimal_nsga2_krg.xlsx'")
+print("Pareto optimal results have been saved to 'pareto_optimal_nsga2_krg.xlsx'")
+
+# Thêm phân tích độ nhạy (Sensitivity Analysis)
+def compute_sensitivity(model, X, scaler, output_name):
+    n_samples = X.shape[0]
+    sensitivities = np.zeros((n_samples, X.shape[1]))
+    
+    for i in range(n_samples):
+        X_perturb = X[i].reshape(1, -1)
+        for j in range(X.shape[1]):
+            X_perturb_delta = X_perturb.copy()
+            delta = 0.01 * (X[:, j].max() - X[:, j].min())  # Nhỏ perturbation
+            X_perturb_delta[0, j] += delta
+            Y_base = model.predict_values(X_perturb).flatten()
+            Y_perturb = model.predict_values(X_perturb_delta).flatten()
+            Y_base_actual = scaler.inverse_transform(Y_base.reshape(-1, 1)).flatten()
+            Y_perturb_actual = scaler.inverse_transform(Y_perturb.reshape(-1, 1)).flatten()
+            sensitivities[i, j] = np.abs((Y_perturb_actual - Y_base_actual) / delta)
+    
+    return np.mean(sensitivities, axis=0)
+
+# Tính độ nhạy cho STH và Height
+sensitivity_sth = compute_sensitivity(model_sth, X, scaler_sth, "STH")
+sensitivity_height = compute_sensitivity(model_height, X, scaler_height, "Height")
+
+# Vẽ đồ thị độ nhạy
+params = ['X1', 'X2', 'X3']
+plt.figure(figsize=(10, 6))
+plt.bar(np.arange(len(params)) - 0.2, sensitivity_sth, 0.4, label='STH Sensitivity', color='blue')
+plt.bar(np.arange(len(params)) + 0.2, sensitivity_height, 0.4, label='Height Sensitivity', color='red')
+plt.xlabel('Parameters', fontsize=18)
+plt.ylabel('Average Sensitivity (mm/unit)', fontsize=18)
+plt.title('Sensitivity Analysis of Parameters on STH and Height', fontsize=18)
+plt.xticks(np.arange(len(params)), params, fontsize=18)
+plt.tick_params(axis='both', labelsize=18)
+plt.legend(fontsize=18)
+plt.grid(True)
+plt.tight_layout()
+plt.savefig('Figure/sensitivity_analysis.png')
+plt.close()
+
+print(f"Sensitivity Analysis Results:")
+print(f"STH Sensitivity: X1={sensitivity_sth[0]:.4f}, X2={sensitivity_sth[1]:.4f}, X3={sensitivity_sth[2]:.4f}")
+print(f"Height Sensitivity: X1={sensitivity_height[0]:.4f}, X2={sensitivity_height[1]:.4f}, X3={sensitivity_height[2]:.4f}")
